@@ -1,0 +1,6 @@
+This is straight up copied from 
+    github.com/upspin/upspin/master/errors/debug.go
+    github.com/upspin/upspin/master/errors/errors.go
+with minor changes to fit this to this application. 
+Credit goes to 
+.... TODO

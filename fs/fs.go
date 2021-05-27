@@ -8,8 +8,9 @@ type FileHeader struct {
 
 type DirHeader struct {
 	Relpath, Name string
+	ModTime, Inode uint64 // size = len(dh.Children)
 	State State
-	Children []FileHeader // size = len(dh.Children)
+	Children []FileHeader
 }
 
 

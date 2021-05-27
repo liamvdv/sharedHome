@@ -2,3 +2,4 @@ test_
 testconf
 temp
 *credentials.json
+*token.json

@@ -23,25 +23,30 @@ import (
 var _ backend.Service
 var _ = config.Dir
 
+const (
+	DriveCredentialsFilename = "drive-credentials.json"
+	DriveTokenFilename       = "drive-token.json"
+)
 
-
-const DriveCredentialsFilename = "drive-credentials.json"
-
-var DriveCredentialsFilepath string
+var (
+	DriveCredentialsFilepath string
+	DriveTokenFilepath       string
+)
 
 func init() {
 	DriveCredentialsFilepath = filepath.Join(config.Dir, DriveCredentialsFilename)
+	DriveTokenFilepath = filepath.Join(config.Dir, DriveTokenFilename)
 }
 
 // Retrieve a token, saves the token, then returns the generated client.
-func getClient(cfg *oauth2.Config) *http.Client {
+func GetClient(cfg *oauth2.Config) *http.Client {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
-	tok, err := tokenFromFile(DriveCredentialsFilepath)
+	tok, err := tokenFromFile(DriveTokenFilepath)
 	if err != nil {
 		tok = getTokenFromWeb(cfg)
-		saveToken(DriveCredentialsFilepath, tok)
+		saveToken(DriveTokenFilepath, tok)
 	}
 	return cfg.Client(context.Background(), tok)
 }

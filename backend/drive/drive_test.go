@@ -22,6 +22,7 @@ func TestDriveOnline(t *testing.T) {
 	config.Init()
 
 	ctx := context.Background()
+	fmt.Println(DriveCredentialsFilepath, DriveTokenFilepath)
 	b, err := os.ReadFile(DriveCredentialsFilepath)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
@@ -32,7 +33,7 @@ func TestDriveOnline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-	client := getClient(config)
+	client := GetClient(config)
 
 	srv, err := drive.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {

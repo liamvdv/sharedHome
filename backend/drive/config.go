@@ -20,8 +20,7 @@ import (
 // https://developers.google.com/workspace/guides/create-credentials
 // https://pkg.go.dev/google.golang.org/api/drive/v3#AboutService
 
-var _ backend.Service
-var _ = config.Dir
+var _ backend.Service = (*Drive)(nil)
 
 const (
 	DriveCredentialsFilename = "drive-credentials.json"
@@ -66,24 +65,27 @@ func tokenFromFile(fp string) (*oauth2.Token, error) {
 // Request a token from the web, then returns the retrieved token.
 func getTokenFromWeb(cfg *oauth2.Config) *oauth2.Token {
 	authURL := cfg.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Printf("Go to the following link in your browser then type the "+
-		"authorization code: \n%v\n", authURL) // TODO(liamvdv)
+	fmt.Printf(`
+Open the following link in your browser and proceed the prompts. 
+Copy the provided authorization code and paste it in the terminal.
+Follow link: %v
+Authorization code:`, authURL) 
 
 	var authCode string
 	if _, err := fmt.Scan(&authCode); err != nil {
-		log.Fatalf("Unable to read authorization code %v", err) // TODO(liamvdv)
+		log.Fatalf("Unable to read authorization code %v", err)  // TODO(liamvdv)
 	}
 
 	tok, err := cfg.Exchange(context.TODO(), authCode)
 	if err != nil {
-		log.Fatalf("Unable to retrieve token from web %v", err) // TODO(liamvdv)
+		log.Fatalf("Unable to retrieve token from web %v", err)  // TODO(liamvdv)
 	}
 	return tok
 }
 
 // Saves a token to a file path.
 func saveToken(fp string, tok *oauth2.Token) {
-	fmt.Printf("Saving credential file to: %s\n", fp) // TODO(liamvdv)
+	fmt.Printf("Saving credentials file to: %s\n", fp)  // TODO(liamvdv)
 	file, err := os.OpenFile(fp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Fatalf("Unable to cache oauth token: %v", err) // TODO(liamvdv)

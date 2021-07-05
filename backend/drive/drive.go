@@ -5,13 +5,10 @@ import (
 	errs "errors"
 	"fmt"
 	"io"
-	"log"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
+	"time"
 
 	"github.com/liamvdv/sharedHome/backend"
+	_ "github.com/liamvdv/sharedHome/errors"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/googleapi"
 )
@@ -25,34 +22,53 @@ import (
 // https://gist.github.com/TheGU/e6d0ae13f2fa83f3bd8d
 // https://console.cloud.google.com/apis/credentials?project=sharedhome
 
-// rootId stores the id of the sharedHome folder. Its child is the root of a mounted filesystem.
+// rootId stores the id of the sharedHome folder.
+// Its child is the root of a mounted filesystem.
 var rootId string
 
+// initGlobals gets or creates the root application folder and stores its id to
+// rootId.
 func initGlobals(srv *drive.Service) error {
-	q := fmt.Sprintf("title = %q and mimeType = 'application/vnd.google-apps.folder'", backend.RemoteFolderName)
-	// fetch the sharedHome ID and that of all sub folders.
-
-	r, err := srv.Files.List().Q(q).Do()
+	f, err := getOrCreateFolder(context.Background(), srv, "root", backend.RemoteFolderName, 0) // rename?
 	if err != nil {
-		return handleDoError(r.Files[0], err) // rethink
+		return err
 	}
-	// TODO(liamvdv): should check if parents are root, because user filesystem might contain a folder which equals backend.RemoteFolderName.
-	if len(r.Files) != 1 {
-		log.Panicf("More than one root folder with name %q.", backend.RemoteFolderName)
-	}
-
-	rootId = r.Files[0].Id
+	rootId = f.Id
 	return nil
 }
 
-func createFile(ctx context.Context, srv *drive.Service, parentID string, name string, mtime uint64, src io.Reader) error {
+func getFile(
+	ctx context.Context,
+	srv *drive.Service,
+	fileID string,
+	dst io.Writer,
+) error {
+	resp, err := srv.Files.Get(fileID).AcknowledgeAbuse(true).Context(ctx).Download()
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
+	if _, err := io.Copy(dst, resp.Body); err != nil {
+		return err
+	}
+	return nil
+}
+
+func createFile(
+	ctx context.Context,
+	srv *drive.Service,
+	parentID string,
+	name string,
+	mtime uint64,
+	src io.Reader,
+) error {
+	t := time.Unix(int64(mtime), 0)
 	file := &drive.File{
-		Name:            name,
-		ModifiedTime:    strconv.FormatUint(mtime, 10),
-		Parents:         []string{parentID},
-		IsAppAuthorized: true,
-		// MimeType:         "application/octet-stream", // binary
+		Name:         name,
+		ModifiedTime: t.Format(time.RFC3339),
+		Parents:      []string{parentID},
+		MimeType:     "application/vnd.google-apps.file", // binary
 		// FileExtension:    ".bin",
 	}
 
@@ -60,89 +76,171 @@ func createFile(ctx context.Context, srv *drive.Service, parentID string, name s
 	// googleapi.DefaultUploadChunkSize is 10MB, can be any mulpiple of 256kB.
 	// TODO(liamvdv): look into Media()s googleapi.MediaOptions
 	// googleapi.ContentType
-	res, err := srv.Files.
+	_, err := srv.Files.
 		Create(file).
-		Media(src, googleapi.ContentType("application/octet-stream")).
+		Media(src, googleapi.ContentType("application/octet-stream")). // TODO(liamvdv): proper mime type.
 		Context(ctx).
 		Do()
-	return handleDoError(res, err)
+	return handleDoError(err)
 }
 
 // Do executes the "drive.files.insert" call. Exactly one of *File or error will be non-nil.
 // Any non-2xx status code is an error. Response headers are in either *File.ServerResponse.Header
 // or (if a response was returned at all) in error.(*googleapi.Error).Header.
 // Use googleapi.IsNotModified to check whether the returned error was because http.StatusNotModified was returned.
-func handleDoError(file *drive.File, err error) error {
-	// *googleapi.Error
-	// TODO(liamvdv): we have access to headers, dunno how to handle anything.
-	var code int
-	if file == nil {
-		code = err.Code
-	} else {
-		code = file.ServerResponse.HTTPStatusCode
-	}
-	if code == http.StatusNotModified {
-		return nil
-	}
-	return nil
+func handleDoError(err error) error {
+	// TODO(liamvdv): TODO
+	return err
 }
 
-func getOrCreateFolder(srv *drive.Service, name string, mtime uint64, parentID string) (*drive.File, error) {
-	folder, err := getFolder(srv, name, parentID)
+func getOrCreateFolder(
+	ctx context.Context,
+	srv *drive.Service,
+	parentID string,
+	name string,
+	mtime uint64,
+) (*drive.File, error) {
+	folder, err := getFolder(ctx, srv, parentID, name)
 	if err == nil {
 		return folder, nil
-	}
-
-	return createFolder(srv, name, mtime, parentID)
-}
-
-// createFolder does not check if folder already exists. use getOrCreateFolder for that.
-func createFolder(srv *drive.Service, name string, mtime uint64, parentID string) (*drive.File, error) {
-	r, err := srv.Files.
-		Create(
-			&drive.File{
-				Name:         "sharedHome",
-				MimeType:     "application/vnd.google-apps.folder",
-				ModifiedTime: strconv.FormatUint(mtime, 10),
-				Parents:      []string{parentID}}).
-		Fields("*").
-		Do()
-	if err != nil {
+	} else if !errs.Is(err, FileNotFoundErr) {
 		return nil, err
 	}
-	return r, nil
+	return createFolder(ctx, srv, parentID, name, mtime)
 }
 
+var FileNotFoundErr = errs.New("Remote: no matching file found.")
 var AmbigousFileErr = errs.New("Remote: two files or folders have the same name.")
 
-func getFolder(srv *drive.Service, name, parentID string) (*drive.File, error) {
-	q := fmt.Sprintf("name = %q and mimeType = 'application/vnd.google-apps.folder' and %q in parents", name, parentID)
+func getFolder(
+	ctx context.Context,
+	srv *drive.Service,
+	parentID string,
+	name string,
+) (*drive.File, error) {
+	q := fmt.Sprintf("trashed = false and name = '%s' and mimeType = 'application/vnd.google-apps.folder' and '%s' in parents", name, parentID)
 
-	r, err := srv.Files.List().Q(q).Fields("*").Do()
+	r, err := srv.Files.List().Q(q).Fields("*").Do() // TODO(liamvdv): .Fields("files(id, name, size, trashed, parents)") probably enough.
 	if err != nil {
 		return nil, err
 	}
-	if len(r.Files) != 1 {
+	if l := len(r.Files); l == 0 {
+		return nil, FileNotFoundErr
+	} else if l > 1 {
 		return nil, AmbigousFileErr
 	}
 	return r.Files[0], nil
 }
 
-func (d *Drive) getParent(dp string) string {
+// createFolder does not check if folder already exists. use getOrCreateFolder for that.
+func createFolder(
+	ctx context.Context,
+	srv *drive.Service,
+	parentID string,
+	name string,
+	mtime uint64,
+) (*drive.File, error) {
+	t := time.Unix(int64(mtime), 0)
+	r, err := srv.Files.
+		Create(
+			&drive.File{
+				Name:         name,
+				ModifiedTime: t.Format(time.RFC3339),
+				MimeType:     "application/vnd.google-apps.folder",
+				Parents:      []string{parentID}}).
+		Fields("*").
+		Do()
+	if err != nil {
+		return nil, handleDoError(err)
+	}
+	return r, nil
+}
+
+// https://developers.google.com/drive/api/v3/search-files
+// https://github.com/mtojek/gdriver/blob/main/internal/upload/
+// getParent is currently unbelivably inefficient, but a quick solution.
+func (d *Drive) getParent(dp string) (string, error) {
 	if dp == "" {
 		panic("calling getParent with empty dirpath")
 	}
 
 	id, found := d.parIDs[dp]
 	if found {
-		return id
+		return id, nil
 	}
-	// if it's not found, query remote to find all missing IDs in this path.
-	names := strings.Split(dp, string(os.PathSeparator))[1:] // exclude "" before seperator
-	subq := "name = %q" 
-	if l := len(names); l > 1 {
-		subq = subq + " " + strings.Repeat("or " + subq, l-1)
+
+	// just get all folder for know.
+	// TODO(liamvdv): make this concurently proof
+	q := fmt.Sprintf("trashed = false and mimeType = 'application/vnd.google-apps.folder'")
+
+	f, err := d.srv.Files.List().Q(q).Fields("nextPageToken, files(id, name)").OrderBy("orderBy=modifiedTime desc").Do()
+	if err != nil {
+		return "", err
 	}
-	q := fmt.Sprintf(subq + " and mimeType = 'application/vnd.google-apps.folder'", names) 
-	
+	return f.NextPageToken, err //TODO(liamvdv): bullshit
+	// nextPage := f.NextPageToken
+	// for nextPage != "" {
+	// 	for _, f := range f.Files {
+
+	// 	}
+
+	// }
+	// d.parIDs[dp] = f.ID
 }
+
+// TODO(liamvdv): To difficult for current knowledge of other system, use inefficient per request lookup
+// or i should fetch all folders with a single get (max 1000 folders, then per page.)
+
+// // getParent returns the id of the folder dp.
+// // getParent is quite inefficient, maybe ids should be stores in cache.
+// func (d *Drive) getParent(dp string) (string, error) {
+// 	if dp == "" {
+// 		panic("calling getParent with empty dirpath")
+// 	}
+
+// 	id, found := d.parIDs[dp]
+// 	if found {
+// 		return id, nil
+// 	}
+
+// 	// if it's not found, query remote to find all missing folder IDs in this path.
+// 	names := strings.Split(dp, string(os.PathSeparator))[1:] // exclude "" before seperator
+// 	subq := "name = %q"
+// 	if l := len(names); l > 1 {
+// 		subq = subq + " " + strings.Repeat("or "+subq, l-1)
+// 	}
+
+// 	q := fmt.Sprintf(subq+" and trashed = false and mimeType = 'application/vnd.google-apps.folder'", names)
+
+// 	fl, err := d.srv.Files.List().Q(q).Fields("files(id, name, trashed, parents)").Do()
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	if l := len(fl.Files); l > len(names) {
+// 		// /abc/foo and /cdu/foo, foo will occure multiple times, check parents.
+// 		// TODO(liamvdv): unable to handle /abc/foo and /abc/foo, sadly permitted by drive api
+// 		var once bool
+// 		var ret string
+
+// 		var localParID string
+// 		for i := len(names)-1; i >= 0; i-- {  // reverse
+// finding parent difficult. Maybe set OrderBy() function and order by createdtime. parent dirs will be older, because they are required to create child dirs.
+// 			name := names[i]
+// 			for _, f := range fl.Files {
+// 				if f.Name == name {
+// 					if !once {
+// 						ret = f.Id
+// 						once = true
+// 					}
+// 					if
+// 					d.parIDs[dp] = f.Id
+// 					dp = filepath.Base(dp) // chop last dir off
+// 					break
+// 				}
+// 			}
+// 		}
+
+// 	} else if l < len(names) {
+// 		return "", FileNotFoundErr // not exactly found.
+// 	}
+// }

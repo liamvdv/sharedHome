@@ -13,9 +13,6 @@ import (
 const FILENAME = "index"
 
 
-
-
-
 // ~/LOG_FILENAME
 const LOG_FILENAME = ".sharedHome.log"
 

@@ -4,7 +4,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/liamvdv/sharedHome/backend"
 	"github.com/liamvdv/sharedHome/errors"
@@ -21,7 +20,7 @@ var (
 
 // Drive must implement Service.
 type Drive struct {
-	srv *drive.Service
+	srv    *drive.Service
 	parIDs map[string]string
 }
 
@@ -46,6 +45,7 @@ func New() (*Drive, error) {
 	}
 
 	if err := initGlobals(srv); err != nil {
+		log.Panicf("could not initGlobals: %v\n", err) // TODO(liamvdv): remove
 		return nil, err
 	}
 
@@ -54,43 +54,42 @@ func New() (*Drive, error) {
 	}, nil
 }
 
-func (d *Drive) CreateFile(ctx context.Context, header fs.FileHeader, src io.Reader) error {
-	dp := filepath.Dir(header.Name)
-	parentID := getParent(filepath.Dir(header.Name))
-	name := header.Name[]
-	_, err := createFile(ctx, d.srv, parentID, )
+func (d *Drive) CreateFile(ctx context.Context, h backend.RemoteFileHeader, src io.Reader) error {
+	parentId := "TODO" // TODO(liamvdv): proper parent
+
+	return createFile(ctx, d.srv, parentId, h.Name, h.Local.ModTime, src)
 }
 
-func (d *Drive) ReadFile(ctx context.Context, header fs.FileHeader, dst io.Writer) error {
+func (d *Drive) ReadFile(ctx context.Context, h backend.RemoteFileHeader, dst io.Writer) error {
 	return nil
 }
 
-func (d *Drive) UpdateFile(ctx context.Context, header fs.FileHeader, src io.Reader) error {
+func (d *Drive) UpdateFile(ctx context.Context, h backend.RemoteFileHeader, src io.Reader) error {
 	return nil
 }
 
-func (d *Drive) DeleteFile(ctx context.Context, header fs.FileHeader) error {
+func (d *Drive) DeleteFile(ctx context.Context, h backend.RemoteFileHeader) error {
 	return nil
 }
 
-func (d *Drive) RenameFile(ctx context.Context, oldHeader, newHeader fs.FileHeader) error {
+func (d *Drive) RenameFile(ctx context.Context, oldHeader, newHeader backend.RemoteFileHeader) error {
 	return nil
 }
 
 //
-func (d *Drive) CreateDir(ctx context.Context, header fs.DirHeader) error {
+func (d *Drive) CreateDir(ctx context.Context, h backend.RemoteDirHeader) error {
 	return nil
 }
 
-func (d *Drive) ReadDir(ctx context.Context, header fs.DirHeader) (fs.DirHeader, error) {
+func (d *Drive) ReadDir(ctx context.Context, h backend.RemoteDirHeader) (fs.DirHeader, error) {
 	return fs.DirHeader{}, nil
 }
 
-func (d *Drive) DeleteDir(ctx context.Context, header fs.DirHeader) error {
+func (d *Drive) DeleteDir(ctx context.Context, h backend.RemoteDirHeader) error {
 	return nil
 }
 
-func (d *Drive) RenameDir(ctx context.Context, oldHeader, newHeader fs.DirHeader) error {
+func (d *Drive) RenameDir(ctx context.Context, oldHeader, newHeader backend.RemoteDirHeader) error {
 	return nil
 }
 

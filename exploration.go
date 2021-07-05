@@ -54,10 +54,13 @@ func NewExploration(root string, nWorkers int, next chan<- fs.DirHeader) *explor
 	return &exp
 }
 
-func (exp *exploration) Start() {
+func (exp *exploration) add(fp string) {
 	exp.jobwg.Add(1)
 	exp.dirpaths <- exp.root
+}
 
+func (exp *exploration) Start() {
+	exp.add(exp.root)
 	go func() {
 		exp.jobwg.Wait()
 		close(exp.dirpaths) //  will stop workers
@@ -101,7 +104,7 @@ func (exp *exploration) explorer() {
 
 			fp := filepath.Join(dp, name)
 			if excl {
-				// TODO(liamvdv) do more?
+				// TODO(liamvdv): do more?
 				log.Printf("Ignored: %s\n", fp)
 				continue
 			}
@@ -175,7 +178,7 @@ func getIgnoreFunc(dp string, names []string) (IgnoreFunc, error) {
 			s = s[:li]
 		}
 		// TODO(liamvdv): we currently only accept "filename" and "dirname",
-		// NOT "/filename" or "/path/filename" or any **regexp** <- should support regexp!
+		// NOT "/filename" or "/path/filename" or any **regexp** <- should support globs.
 		// look at golang.org/pkg/path/filepath/#Match
 		ignoreNames = append(ignoreNames, s)
 	}

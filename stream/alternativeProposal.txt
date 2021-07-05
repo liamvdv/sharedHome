@@ -1,0 +1,70 @@
+Although it would be great to directly send a byte stream through the compression and encryption phase to the sdk handleing the backend, a failure
+at any point requires to redo the hole operation. 
+
+This might be less efficient, since it will be first written to a file and then read from there, but it prevents recomputation in the case of a network problem.
+
+local file -> compression and encryption stream -> temp local file -> handle (rewinded) passed to backend.
+
+This also allows us to limit the resource usage in the up and download of files, by limiting the number of files in the pool. Controling the size of the files is not so important, since they are all buffered.
+
+
+
+type Filer struct {
+    permitted int
+    // Files is a buffered channel of size permitted. 
+    files chan *os.File // when a file is used, it gets recieved from the channel. When the file is no longer needed, it is returned to the channel. It works because the number of files added is limited. 
+}
+
+// File blocks until a file is available
+func (f *Filer) File() *os.File {
+    return <-f.files
+}
+
+
+---
+Encrypt
+1) Open local file
+2) Wrap with compression and encryption
+3) Take a temporary file
+4) Write the content to the file
+    1) write enc header (version, iv)
+    2) write enc content
+    3) write enc footer (hmac)
+5) Use transport, hand of temp file. Repeated attemps must be interleaved by rewinding the file pointer.
+
+
+Decrypt
+1) Open local file with unused alias, provide metadata like creation data, mod date....
+2) create a pipe, write to it in transport code.
+3) in application code, use the pipe reader to
+    1) read the enc header (verison, iv)
+    2) create decryption and decompression,  
+2) wrap with decryption and decompression
+3) Download file, read Body and write to the local file alias while:
+    1) reading enc header
+    2) decryption the following content
+
+tempFile, err := os.OpenFile(alias, os.O_CREATE|os.O_RDWR|os.O_EXCL, 0600)
+if err != nil {
+    return err
+}
+defer SaveClose(tempFile)
+
+// build a struct which reads from resp.body and does the necessary operations to transform the byte stream
+
+type StreamDecryptionDecompress struct {
+    state
+    consumeBy func (buf []byte) (int, error)
+    dst io.Writer
+}
+
+func (s *StreamDecryptionDecompress) Write(p []byte) (int, error) {
+    switch s.state {
+    case Header:
+        s.consumeBy = consumeHeader
+        return s.consumeBy(p)
+    case Content:
+        s.consumeBy = consumeContent
+        return s.consumeBy(p)
+    }
+}

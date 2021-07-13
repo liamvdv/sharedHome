@@ -1,18 +1,25 @@
 package fs
 
-type FileHeader struct {
-	Name string
-	Size, ModTime, Inode uint64
-	State State
+import (
+	stdfs "io/fs"
+	"path/filepath"
+)
+
+type File struct {
+	Relpath string
+	CTime   int64
+	MTime   int64
+	Mode    stdfs.FileMode
+	Inode   uint64
+	Size    int64
+
+	Children []File
+	State    State
 }
 
-type DirHeader struct {
-	Relpath, Name string
-	ModTime, Inode uint64 // size = len(dh.Children)
-	State State
-	Children []FileHeader
+func (f *File) Name() string {
+	return filepath.Base(f.Relpath)
 }
-
 
 type State uint16
 

@@ -1,0 +1,12 @@
+*
+!.gitignore
+!spec.txt
+
+!hash.go
+!compression.go
+!encryption.go
+!encryption_hash.go
+
+!testdata
+!testdata/*
+!testresult

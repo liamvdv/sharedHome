@@ -1,0 +1,23 @@
+This file provides the API to encrypt (and compress) any kind of stream of bits.
+The flow of encrypting and decrypting files over the network should work as follows:
+
+Encryption
+1) Open src which is an io.Reader (File) // ensure its not a dir
+2) Wrap that file with compression
+3) Wrap that compression file with encryption, i. e. Enc(Comp(File))
+4) Write the metadata to dst.
+5) Read from src and Write to dst and hmac, which will compress end encrypt the file.
+6) Calcuate the sum of hmac and write it to dst unencrypted.
+x) dst can now be closed and move around and used by the decryption code.
+
+Decryption
+1) [May be dropped to inc efficiency but more complex:] Recieve full data stream and write to file. When finished successfully, rewind handler src.
+2) Read and trim hmac at the end of the file. Rewind fd to file start.
+3) Read header bytes from src
+4) Wrap src with decryption.
+5) Wrap src with decompression, i. e. Decomp(Decryp(File))
+6) Open the dst io.Writer file with the specified metadata (ctime, mtime, perms,....)
+7) Read from src and Write to dst, which will decrypt and decompress the file.
+9) Calculate Hmac and compare with trimmed hmac. If the result does not match, reject the file.
+10) Replace the current version of the file with the updated file with os.Rename().
+11) Release the used buffer files back to the tmp file pool.

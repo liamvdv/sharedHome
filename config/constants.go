@@ -11,6 +11,10 @@ import (
 
 const (
 	IgnoreFile = ".notshared"
+
+	// IndexFileTemplate = {sun}.bin
+	// sun is the sequential update number
+	IndexFileTemplate = "%s.bin"
 )
 
 var (
@@ -21,6 +25,7 @@ var (
 	BackendConfigFolder string
 
 	// IndexCacheFolder = CONFIG_DIR/sharedHome/index
+	// Stores zero or more Cache files identified by their sequential update number.
 	IndexCacheFolder string
 
 	// TempCacheFolder = CONFIG_DIR/sharedHome/temp

@@ -1,5 +1,7 @@
-test_
-testconf
-temp
+# access files
 *credentials.json
 *token.json
+
+# testing might create them on the local directory
+_fakeConfigDir
+testresult

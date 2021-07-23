@@ -1,0 +1,20 @@
+.notshared should have the same behaviour as .gitignore:
+Trailing spaces are ignored if not escaped with '\'.
+# 		starts a comment
+! 		negates a pattern
+\ 		to escape characters, like ! at the start of a filename.
+/ 		is the directory seperator, also on windows.
+        / at the start or middle of a path means absolute paths relative to the notshared file.
+        if that is not the case, the names are recursively matched.
+        / at the end of a path means that only directories are matched.
+* 			matches everything except a slash '/'
+? 			matches every character except a slash '/'
+[a-zA-Z] 	lexical character groups can be used to match one character.
+
+**/foo		matches a file or directory anywhere, f. e. **/node_modules
+**/foo/bar	matches any directory compination from .notshared onwards, i. e.  
+a/**/b		
+foo/**      matches all content in foo.
+
+Possible implementation: 
+https://github.com/go-git/go-git/blob/master/plumbing/format/gitignore

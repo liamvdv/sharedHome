@@ -14,7 +14,10 @@ const (
 
 	// IndexFileTemplate = {sun}.bin
 	// sun is the sequential update number
-	IndexFileTemplate = "%s.bin"
+	IndexFileTemplate = "%d.bin"
+	// LockIndexFileTemplate = lock-{sun}.bin
+	// lock is used to prevent other clients form accessing the index file.
+	LockIndexFileTemplate = "lock-%d.bin"
 )
 
 var (
@@ -33,6 +36,9 @@ var (
 
 	// ConfigFile = CONFIG_DIR/sharedHome/configuration.json
 	ConfigFile string
+
+	// LogFolder = CONFIG_DIR/sharedHome/log
+	LogFolder string
 )
 
 // InitVars ensures that all named paths and folders exist. It does not check the content, i. e.
@@ -73,6 +79,10 @@ func InitVars() {
 	if err := existOrCreate(TempCacheFolder, true); err != nil {
 		log.Panic(err)
 	}
+	LogFolder = filepath.Join(ConfigFolder, "log")
+	if err := existOrCreate(LogFolder, true); err != nil {
+		log.Panic(err)
+	}
 }
 
 type deleteTargets int
@@ -84,6 +94,7 @@ const (
 	D_ConfigFile
 	D_BackendConfigFolder
 	D_IndexCacheFolder
+	D_LogFolder
 	nTargets
 )
 
@@ -94,6 +105,7 @@ var deleteTargetMapping = []*string{
 	D_ConfigFile:          &ConfigFile,
 	D_BackendConfigFolder: &BackendConfigFolder,
 	D_IndexCacheFolder:    &IndexCacheFolder,
+	D_LogFolder:           &LogFolder,
 }
 
 // TODO(liamvdv): Use in main with

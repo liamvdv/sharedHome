@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type File struct {
@@ -38,8 +39,22 @@ func (f *File) Dir() string {
 
 func (f *File) DirBase() (dirpath string, name string) {
 	dirpath = filepath.Dir(f.Relpath)
-	return dirpath, f.Relpath[len(dirpath)+1:] // len('1') = 1
+	return dirpath, f.Relpath[len(dirpath)+1:] // len('/') = 1
 }
+
+// Compare returns true if the files are the same. The state and children are not compared.
+func (a *File) Equals(b *File) bool {
+	return a.Inode == b.Inode &&
+		a.Relpath == b.Relpath &&
+		a.CTime == b.CTime &&
+		a.MTime == b.MTime &&
+		a.Mode == b.Mode &&
+		a.Size == b.Size
+}
+
+func (f File) String() string {
+	return fmt.Sprintf("{rp: %q %s s: %s mtime: %s}", f.Relpath, f.Mode, f.State, time.Unix(0, f.MTime))
+} 
 
 type State uint16
 
@@ -90,9 +105,10 @@ func LocalPath(relpath string) string {
 }
 
 func PrettyPrint(w io.Writer, f *File) error {
+	// need to sperate for identWriter to work properly...
 	fmt.Fprintln(w, "Relpath:", f.Relpath)
-	fmt.Fprintf(w, "CTime: %d\n", f.CTime)
-	fmt.Fprintf(w, "MTime: %d\n", f.MTime)
+	fmt.Fprintf(w, "CTime: %s\n", time.Unix(0, f.CTime))
+	fmt.Fprintf(w, "MTime: %s\n", time.Unix(0, f.MTime))
 	fmt.Fprintln(w, "Mode:", f.Mode.String())
 	fmt.Fprintf(w, "Inode: %d\n", f.Inode)
 	fmt.Fprintf(w, "Size: %d\n", f.Size)

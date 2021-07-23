@@ -1,6 +1,7 @@
 # access files
 *credentials.json
 *token.json
+*.log
 
 # testing might create them on the local directory
 _fakeConfigDir

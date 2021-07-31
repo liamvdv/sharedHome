@@ -1,21 +1,25 @@
 // +build linux darwin unix
 
-package fs
+package vfs
 
 import (
 	stdfs "io/fs"
 	"syscall"
 
+	"github.com/liamvdv/sharedHome/osx"
 	"golang.org/x/sys/unix"
 )
 
 // https://cs.opensource.google/go/go/+/master:src/os/stat_linux.go;drc=master
 
 // Enrich fills all fields in File except Relpath. The first argument must be the absolut path to the file.
-func Enrich(fp string, f *File) error {
+func Enrich(fs osx.Fs, abspath string, f *File) error {
 	// https://pkg.go.dev/golang.org/x/sys@v0.0.0-20210630005230-0f9fa26af87c/unix#Stat_t
+	if _, isMock := fs.(*osx.MemMapFs); isMock {
+		return enrichMock(fs, abspath, f)
+	}
 	var stat unix.Stat_t
-	if err := unix.Stat(fp, &stat); err != nil {
+	if err := unix.Stat(abspath, &stat); err != nil {
 		return err
 	}
 	f.CTime = timespecToUnixNano(stat.Ctim)

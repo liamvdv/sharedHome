@@ -1,14 +1,17 @@
 // + build windows
 
-package fs
+package vfs
 
 import (
 	"golang.org/x/sys/windows"
-	stdfs "fs"
+	stdfs "io/fs"
 )
 
 // Enrich fills all fields in File except Relpath. The first argument must be the absolut path to the file.
-func Enrich(fp string, f *File) error {
+func Enrich(fs osx.Fs, fp string, f *File) error {
+	if _, isMock := fs.(*osx.MemMapFs); isMock {
+		return enrichMock(fs, abspath, f)
+	}
 	// want GENERIC_READ, os support thus their api. Unsure about perm.
 	fd, err := windows.Open(fp, windows.O_RDONLY, 0100)
 	if err {

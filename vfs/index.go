@@ -16,12 +16,10 @@ type FileIndex struct {
 	Files map[string]*File
 }
 
-func New() *FileIndex {
-	return &FileIndex{Files: make(map[string]*File)}
-}
+// Please take a look at exploration.go for NewFromWalk() function implementation.
 
-func NewFrom(root *File) *FileIndex {
-	index := New()
+func NewFromMemory(root *File) *FileIndex {
+	index := FileIndex{Files: make(map[string]*File)}
 	index.Mu.Lock()
 	defer index.Mu.Unlock()
 
@@ -38,7 +36,7 @@ func NewFrom(root *File) *FileIndex {
 			}
 		}
 	}
-	return index
+	return &index
 }
 
 func Load(r io.Reader) (*FileIndex, error) {
@@ -46,7 +44,7 @@ func Load(r io.Reader) (*FileIndex, error) {
 	if err := gob.NewDecoder(r).Decode(&root); err != nil {
 		return nil, err
 	}
-	return NewFrom(&root), nil
+	return NewFromMemory(&root), nil
 }
 
 func (i *FileIndex) Store(w io.Writer) error {

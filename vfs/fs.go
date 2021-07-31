@@ -49,14 +49,23 @@ func (f *File) DirBase() (dirpath string, base string) {
 	return
 }
 
-// Compare returns true if the files are the same. The state and children are not compared.
+// Equals returns true if the Relpath, the ModTime and the Mode are the same.
 func (a *File) Equals(b *File) bool {
-	return a.Inode == b.Inode &&
-		a.Relpath == b.Relpath &&
-		a.CTime == b.CTime &&
+	return a.Relpath == b.Relpath &&
+		// cannot compare this since we can't modify it.
+		// a.CTime == b.CTime &&
 		a.MTime == b.MTime &&
-		a.Mode == b.Mode &&
-		a.Size == b.Size
+		a.Mode == b.Mode 
+}
+
+// StrongEquals returns true if the Relpath, the ModTime, the Size and the Mode are the same.
+func (a *File) StrongEquals(b *File) bool {
+	return a.Equals(b) && a.Size == b.Size
+}
+
+// ExactEquals demands that the file have the same inode in addition to StrongEquals
+func (a *File) ExactEquals(b *File) bool {
+	return a.StrongEquals(b) && a.Inode == b.Inode
 }
 
 func (f File) String() string {

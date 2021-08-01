@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/liamvdv/sharedHome/config"
 	"github.com/liamvdv/sharedHome/errors"
 	"github.com/liamvdv/sharedHome/osx"
 )
@@ -13,8 +14,6 @@ import (
 
 const (
 	comment = "#"
-	// TODO(liamvdv): change when config is compileable
-	IgnoreFile = ".notshared"
 )
 
 // IgnoreFunc returns true if a string should be skipped and false if should be included.
@@ -38,9 +37,7 @@ func getIgnoreFunc(fs osx.Fs, dp string, names []string) (IgnoreFunc, error) {
 
 	var there bool
 	for _, name := range names {
-		// TODO(liamvdv): change when config is compileable
-		// if name == config.IgnoreFile {
-		if name == IgnoreFile {
+		if name == config.IgnoreFile {
 			there = true
 			break
 		}
@@ -51,9 +48,7 @@ func getIgnoreFunc(fs osx.Fs, dp string, names []string) (IgnoreFunc, error) {
 		}, nil
 	}
 
-	// TODO(liamvdv): change when config is compileable
-	// fp := filepath.Join(dp, config.IgnoreFile)
-	fp := filepath.Join(dp, IgnoreFile)
+	fp := filepath.Join(dp, config.IgnoreFile)
 	patterns, err := readIgnoreFile(fs, fp)
 	if err != nil {
 		return nil, errors.E(op, errors.Path(fp), err)

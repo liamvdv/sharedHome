@@ -1,29 +1,47 @@
 package main
 
 import (
-	"github.com/liamvdv/sharedHome/backend/drive"
+	"log"
+	"os"
+
 	"github.com/liamvdv/sharedHome/config"
-	"github.com/liamvdv/sharedHome/util"
+	"github.com/liamvdv/sharedHome/osx"
 )
 
 func main() {
-	util.PrepareTestConfigInit()
-	config.Init()
+	env := config.Env{
+		Fs:     osx.NewOsFs(),
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+	config.InitVars(env.Fs, "")
+	defer config.Delete(env.Fs, config.D_TempCacheFolder)
 
-	drive.TestRemoteIdList()
-	// can add own context: List().Context(ctx)...
-	// r, err := srv.Files.Create(&drive.File{Name: "sharedHome", MimeType: "application/vnd.google-apps.folder"}).Fields("*").Do()
-	// if err != nil {
-	// 	log.Fatalf("Unable to retireve files: %v", err)
-	// }
-	// fmt.Printf("%+v\n", *r)
+	cfg, err := config.LoadConfigFile(env)
+	if err != nil {
+		log.Panic(err)
+	}
 
-	// fmt.Println("Name:", r.Name, "ID:", r.Id, "DriveID", r.DriveId)
-	// r, err := srv.Files.List().Q("mimeType = 'application/vnd.google-apps.folder'").Fields("nextPageToken, files(name, id, modifiedTime)").Do()
-	// if err != nil {
-	// 	log.Fatalf("Unable to retrieve files: %v", err)
-	// }
-	// for _, f := range r.Files {
-	// 	fmt.Printf("%q %q %s\n", f.Name, f.Id, f.ModifiedTime)
-	// }
+	// start signal module -> should panic so that all cleanup functions can run
+	// recover here in main for clean exit.
+
+	if len(os.Args) < 2 {
+		log.Println("min 2 args")
+	}
+	switch os.Args[1] {
+	case "sync":
+		Sync(env, cfg)
+	case "init":
+	case "config":
+	case "show":
+	case "unlock":
+	}
+}
+
+func Sync(env config.Env, cfg *config.Config) {
+	// 1. build local index
+	// 1. get remote index -> mutex, ... defer index.Upload()
+
+	// 2. use core packge to look at both indexes and then make the needed changes.
 }

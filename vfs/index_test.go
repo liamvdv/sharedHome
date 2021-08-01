@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/liamvdv/sharedHome/osx"
+	"github.com/liamvdv/sharedHome/testutil"
 	"github.com/liamvdv/sharedHome/vfs"
 )
 
@@ -134,8 +135,8 @@ func TestFileIndexFromWalk(t *testing.T) {
 	wantIndex := vfs.NewFromMemory(&testVfs)
 
 	fs := osx.NewOsFs()
-	dirpath := testDir(fs)
-	defer removeAllTestFiles(t)
+	dirpath := testutil.TestDir(fs)
+	defer testutil.RemoveAllTestFiles(t)
 	buildTestFs(fs, dirpath, &testVfs, t)
 
 	exp := vfs.NewFromWalk(fs, dirpath, ignores)

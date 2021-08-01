@@ -2,36 +2,14 @@ package vfs_test
 
 import (
 	"io/fs"
-	"log"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/liamvdv/sharedHome/osx"
+	"github.com/liamvdv/sharedHome/testutil"
 	"github.com/liamvdv/sharedHome/vfs"
 )
-
-var testRegistry map[osx.Fs][]string = make(map[osx.Fs][]string)
-
-func testDir(fs osx.Fs) string {
-	name, err := osx.TempDir(fs, "", "sharedHome")
-	if err != nil {
-		log.Panicf("Unable to create temp dir %s", err)
-	}
-	testRegistry[fs] = append(testRegistry[fs], name)
-	return name
-}
-
-func removeAllTestFiles(t *testing.T) {
-	for fs, list := range testRegistry {
-		for _, path := range list {
-			if err := fs.RemoveAll(path); err != nil {
-				t.Error(fs.Name(), err)
-			}
-		}
-	}
-	testRegistry = make(map[osx.Fs][]string)
-}
 
 func TestEnrichHostSpecific(t *testing.T) {
 	type test struct {
@@ -48,8 +26,8 @@ func TestEnrichHostSpecific(t *testing.T) {
 		{true, "subdir1.txt", nil, time.Date(2021, 8, 21, 21, 15, 0, 0, time.UTC), 0755},
 	}
 	fs := osx.NewOsFs()
-	dp := testDir(fs)
-	defer removeAllTestFiles(t)
+	dp := testutil.TestDir(fs)
+	defer testutil.RemoveAllTestFiles(t)
 	for _, c := range cases {
 		fp := filepath.Join(dp, c.name)
 		if err := fs.WriteFile(fp, c.content, c.perm); err != nil {

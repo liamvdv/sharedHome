@@ -1,31 +1,44 @@
 package config
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
+	"os"
+	"github.com/liamvdv/sharedHome/osx"
 )
 
-const (
-	backendConfigurationFileTemplate = "%s-configuration.json"
-	backendCredentialsFileTemplate   = "%s-credentials.json"
-	backendTokenFileTemplate         = "%s-token.json"
+var (
+	LoadBackendConfig      loadFunc
+	LoadBackendCredentials loadFunc
+	LoadBackendToken       loadFunc
+
+	StoreBackendConfig      storeFunc
+	StoreBackendCredentials storeFunc
+	StoreBackendToken       storeFunc
 )
 
-// BackendConfigFile returns the ConfigFile for that backend. It has read and write permissions and must be closed by consumer.
-func BackendConfigFile(backend string) (*os.File, error) {
-	fp := filepath.Join(BackendConfigFolder, fmt.Sprintf(backendConfigurationFileTemplate, backend))
-	return os.OpenFile(fp, os.O_CREATE|os.O_RDWR, 0600)
-}
+type loadFunc func(string) ([]byte, error)
+type storeFunc func(string, []byte) error
 
-// BackendCredentialsFile returns the ConfigFile for that backend. It has read and write permissions and must be closed by consumer.
-func BackendCredentialsFile(backend string) (*os.File, error) {
-	fp := filepath.Join(BackendConfigFolder, fmt.Sprintf(backendCredentialsFileTemplate, backend))
-	return os.OpenFile(fp, os.O_CREATE|os.O_RDWR, 0600)
-}
+// we need this setup to inject a fs.
+func initBackendFuncs(fs osx.Fs) {
+	mkLoadFunc := func(template string) loadFunc {
+		return func(backend string) ([]byte, error) {
+			fp := filepath.Join(template, backend)
+			return fs.ReadFile(fp)
+		}
+	}
+	mkStoreFunc := func(template string, perm os.FileMode) storeFunc {
+		return func(backend string, raw []byte) error {
+			fp := filepath.Join(template, backend)
+			return fs.WriteFile(fp, raw, perm)
+		}
+	}
+	LoadBackendConfig = mkLoadFunc("%s-configuration.json")
+	StoreBackendConfig = mkStoreFunc("%s-configuration.json", 0600)
 
-// BackendTokenFile returns the ConfigFile for that backend. It has read and write permissions and must be closed by consumer.
-func BackendTokenFile(backend string) (*os.File, error) {
-	fp := filepath.Join(BackendConfigFolder, fmt.Sprintf(backendTokenFileTemplate, backend))
-	return os.OpenFile(fp, os.O_CREATE|os.O_RDWR, 0600)
+	LoadBackendCredentials = mkLoadFunc("%s-credentials.json")
+	StoreBackendCredentials = mkStoreFunc("%s-credentials.json", 0600)
+
+	LoadBackendToken = mkLoadFunc("%s-token.json")
+	StoreBackendToken = mkStoreFunc("%s-token.json", 0600)
 }

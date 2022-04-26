@@ -1,54 +1,69 @@
 package vfs_test
 
 import (
-	"os"
+	"io/fs"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/liamvdv/sharedHome/osx"
+	"github.com/liamvdv/sharedHome/testutil"
 	"github.com/liamvdv/sharedHome/vfs"
 )
 
-func TestEnrichUnix(t *testing.T) {
-	f := vfs.File{
-		Relpath: "/testdata/sth.txt",
+func TestEnrichHostSpecific(t *testing.T) {
+	type test struct {
+		dir     bool
+		name    string
+		content []byte
+		mtime   time.Time
+		perm    fs.FileMode
 	}
-	fp := "./testdata/sth.txt"
+	var cases = []test{
+		{false, "test0.txt", []byte("gimme gimme gimme"), time.Date(2020, 2, 21, 21, 15, 0, 0, time.UTC), 0644},
+		{false, "test1.txt", []byte("a man after"), time.Date(2020, 8, 21, 21, 15, 0, 0, time.UTC), 0504},
+		{false, "end.md", []byte("midnight"), time.Date(2021, 2, 21, 21, 15, 0, 0, time.UTC), 0700},
+		{true, "subdir1.txt", nil, time.Date(2021, 8, 21, 21, 15, 0, 0, time.UTC), 0755},
+	}
+	fs := osx.NewOsFs()
+	dp := testutil.TestDir(fs)
+	defer testutil.RemoveAllTestFiles(t)
+	for _, c := range cases {
+		fp := filepath.Join(dp, c.name)
+		if err := fs.WriteFile(fp, c.content, c.perm); err != nil {
+			t.Errorf("cannot create %s because %v", fp, err)
+			continue
+		}
+		if err := fs.Chtimes(fp, time.Now(), c.mtime); err != nil {
+			t.Errorf("cannot overwrite mtime because %v", err)
+		}
+	}
 
-	if err := vfs.Enrich(fp, &f); err != nil {
-		t.Error(err)
-	}
-	fi, err := os.Stat(fp)
-	if err != nil {
-		t.Errorf("os.Stat should calculate want, instead failed: %v\n", err)
-	}
-	if fiMtime := fi.ModTime().UnixNano(); fiMtime != f.MTime {
-		t.Errorf("ModTime wrong. want: %d  got: %d\n", fiMtime, f.MTime)
-	}
-	// 0x1FF = 0001 1111 1111
-	// perm = ... r wxrw xrwx
-	if fi.Mode() != f.Mode&0x1FF {
-		t.Errorf("File mode wrong. want: %o  got: %o\n", fi.Mode(), f.Mode)
-	}
-	if fi.Size() != f.Size {
-		t.Errorf("Size wrong. want: %d  got: %d\n", fi.Size(), f.Size)
-	}
-	if f.Relpath != "/testdata/sth.txt" {
-		t.Errorf("Relpath wrong. Enrich must not change the relpath.")
-	}
-}
+	for _, c := range cases {
+		fp := filepath.Join(dp, c.name)
+		// fi, err := fs.Stat(fp)
+		// if err != nil {
+		// 	t.Error(err)
+		// }
 
-func TestFileName(t *testing.T) {
-	f := vfs.File{
-		Relpath: "/testdata/sth.txt",
-	}
-	fp := "./testdata/sth.txt"
+		f := vfs.File{
+			Relpath: filepath.ToSlash(fp[len(dp):]),
+		}
+		if err := vfs.Enrich(fs, fp, &f); err != nil {
+			t.Error(err)
+		}
 
-	fi, err := os.Stat(fp)
-	if err != nil {
-		t.Errorf("os.Stat should calculate want, instead failed: %v\n", err)
-	}
-	fiName := fi.Name()
-	fName := f.Base()
-	if fiName != fName {
-		t.Errorf("want: %q  got %q\n", fiName, fName)
+		if f.Mode != c.perm {
+			t.Errorf("unequal file modes want: %s got %s", c.perm, f.Mode)
+		}
+		if f.MTime != c.mtime.UnixNano() {
+			t.Errorf("unequla modification times want: %s got %s", c.mtime, time.Unix(0, f.MTime))
+		}
+		if f.Size != int64(len(c.content)) {
+			t.Errorf("size does not match up want %d got %d", len(c.content), f.Size)
+		}
+		if f.Relpath != "/"+c.name {
+			t.Errorf("fail: enrich must not modify repath.")
+		}
 	}
 }

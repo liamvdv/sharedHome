@@ -1,0 +1,10 @@
+Most of the code in osx/ and osx/mem/ IS NOT MY CODE. The code is an adapted 
+version of github.com/spf13/afero.
+The code was manipulated to better suit this application.
+
+COPYRIGHT BELONGS TO Steve Francia <spf@spf13.com> AND The Go Authors.
+
+Personal note: 
+If you are familiar with the exact way to handle licenses and find that this way
+is not the correct one, please contact me on github, linkedin or my personal 
+email address. Thank you.

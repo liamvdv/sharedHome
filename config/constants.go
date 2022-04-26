@@ -1,11 +1,14 @@
 package config
 
 import (
-	"errors"
 	"log"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 
+	"github.com/liamvdv/sharedHome/errors"
+	"github.com/liamvdv/sharedHome/osx"
 	"github.com/liamvdv/sharedHome/util"
 )
 
@@ -41,48 +44,93 @@ var (
 	LogFolder string
 )
 
-// InitVars ensures that all named paths and folders exist. It does not check the content, i. e.
-// configurations files may be invalid.
-// When the TESTING is true, the config base directory is $GOPATH/src/github.com/liamvdv/sharedHome/_fakeConfigDir
-func InitVars() {
-	userConfigDir, err := os.UserConfigDir()
-	if err != nil {
-		log.Panic(err)
-	}
-	if TESTING {
-		userConfigDir, err = os.Getwd()
+// InitVars ensures that all named paths and folders exist, else it panics.
+// Pass "" to configDirpath to use the user config directory.
+func InitVars(fs osx.Fs, configDirpath string) {
+	if configDirpath == "" {
+		var err error
+		configDirpath, err = userConfigDir()
 		if err != nil {
 			log.Panic(err)
 		}
-		for ; filepath.Base(userConfigDir) != "sharedHome"; userConfigDir = filepath.Dir(userConfigDir) {
-		}
-		userConfigDir = filepath.Join(userConfigDir, "_fakeConfigDir")
 	}
 
-	ConfigFolder = filepath.Join(userConfigDir, "sharedHome")
-	if err := existOrCreate(ConfigFolder, true); err != nil {
+	ConfigFolder = filepath.Join(configDirpath, "sharedHome")
+	if err := existOrCreate(fs, ConfigFolder, true); err != nil {
 		log.Panic(err)
 	}
 	ConfigFile = filepath.Join(ConfigFolder, "configuration.json")
-	if err := existOrCreate(ConfigFile, false); err != nil {
+	if err := existOrCreate(fs, ConfigFile, false); err != nil {
 		log.Panic(err)
 	}
 	BackendConfigFolder = filepath.Join(ConfigFolder, "backend")
-	if err := existOrCreate(BackendConfigFolder, true); err != nil {
+	if err := existOrCreate(fs, BackendConfigFolder, true); err != nil {
 		log.Panic(err)
 	}
 	IndexCacheFolder = filepath.Join(ConfigFolder, "index")
-	if err := existOrCreate(IndexCacheFolder, true); err != nil {
+	if err := existOrCreate(fs, IndexCacheFolder, true); err != nil {
 		log.Panic(err)
 	}
 	TempCacheFolder = filepath.Join(ConfigFolder, "temp")
-	if err := existOrCreate(TempCacheFolder, true); err != nil {
+	if err := existOrCreate(fs, TempCacheFolder, true); err != nil {
 		log.Panic(err)
 	}
 	LogFolder = filepath.Join(ConfigFolder, "log")
-	if err := existOrCreate(LogFolder, true); err != nil {
+	if err := existOrCreate(fs, LogFolder, true); err != nil {
 		log.Panic(err)
 	}
+}
+
+// userConfigDir is a drop in replacement for os.UserConfigDir that takes care of
+// people to call this as sudo. It works for windows, darwin, ios and unix.
+func userConfigDir() (string, error) {
+	if runtime.GOOS == "windows" {
+		dp := os.Getenv("AppData")
+		if dp == "" {
+			return "", errors.E("%AppData% is not defined")
+		}
+		return dp, nil
+	}
+
+	home := func() string {
+		uname := os.Getenv("SUDO_USER")
+		if uname != "" {
+			u, err := user.Lookup(uname)
+			if err == nil {
+				return u.HomeDir
+			}
+		}
+		return os.Getenv("HOME")
+	}()
+
+	if runtime.GOOS == "darwin" || runtime.GOOS == "ios" {
+		return home + "/Library/Application Support", nil
+	}
+
+	// unix
+	if dp := os.Getenv("XDG_CONFIG_HOME"); dp != "" {
+		return dp, nil
+	}
+	return home + "/.config", nil
+}
+
+func existOrCreate(fs osx.Fs, fp string, isDir bool) error {
+	if util.Exists(fs, fp) {
+		return nil
+	}
+	if isDir {
+		return fs.MkdirAll(fp, 0700)
+	}
+
+	dp := filepath.Dir(fp)
+	if err := fs.MkdirAll(dp, 0700); err != nil {
+		return err
+	}
+	f, err := fs.Create(fp)
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 type deleteTargets int
@@ -108,44 +156,21 @@ var deleteTargetMapping = []*string{
 	D_LogFolder:           &LogFolder,
 }
 
-// TODO(liamvdv): Use in main with
-//	config.InitVars()
-//	defer config.Delete(config.D_TempCacheFolder)
-// Or just rewrite as general Delete(targets ...string) error, but then inputs are not validated and os.RemoveAll is dangerous....
+// TODO(liamvdv): Or just rewrite as general Delete(targets ...string) error,
+// but then inputs are not validated and os.RemoveAll is dangerous....
 
 // Delete deletes temporary directories including their content.
-func Delete(targets ...deleteTargets) error {
+func Delete(fs osx.Fs, targets ...deleteTargets) error {
 	for _, target := range targets {
 		if !(0 <= target && target < nTargets) {
-			return errors.New("target does not exist")
+			return errors.E("target does not exist")
 		}
 		fp := *deleteTargetMapping[target]
 
-		err := os.RemoveAll(fp)
+		err := fs.RemoveAll(fp)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
 }
-
-func existOrCreate(fp string, dir bool) error {
-	if util.Exists(fp) {
-		return nil
-	}
-	if dir {
-		return os.MkdirAll(fp, 0700)
-	}
-
-	dp := filepath.Dir(fp)
-	if err := os.MkdirAll(dp, 0700); err != nil {
-		return err
-	}
-	f, err := os.Create(fp)
-	if err != nil {
-		return err
-	}
-	return f.Close()
-}
-
-// TODO(liamvdv): Implement function for retrieving the backend configuration file that is service dependent.

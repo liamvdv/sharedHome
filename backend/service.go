@@ -3,16 +3,14 @@ package backend
 import (
 	"context"
 	"io"
-
-	"github.com/liamvdv/sharedHome/fs"
 )
 
 /*
-	All backends are required to implement a package level function of type 
+	All backends are required to implement a package level function of type
 	NewBackend and returning a struct adhereing to the service interface.
 	The compiler can check that if you include the following expression globally.
 
-	T is your implementation of the Service interface. 
+	T is your implementation of the Service interface.
 
 	var (
 		_ backend.Service = (*T)(nil)
@@ -29,7 +27,7 @@ type RemoteFileHeader struct {
 	// Name is the encrypted file name
 	Name string
 	// Local is the local FileHeader with information about the local file.
-	Local *fs.FileHeader 
+	Local *fs.FileHeader
 }
 
 type RemoteDirHeader struct {

@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/liamvdv/sharedHome/errors"
-	"github.com/liamvdv/sharedHome/fs"
+	"github.com/liamvdv/sharedHome/vfs"
 )
 
 // See the consistency.txt file for information on the pathspec.
@@ -29,12 +29,12 @@ import (
 // Normal files can be accessed by taking the parent path, looking that one up and then sequential search through the parent's children.
 type DirIndex struct {
 	Mu	 sync.RWMutex
-	Dir   map[string]*fs.File
+	Dir   map[string]*vfs.File
 }
 
 var ErrFileNotFound = errors.E("File not found.")
 // Get accepts the generalised path, i. e. with forward slashes '/'. Returns ErrFileNotFound if the parent or file itself cannot be located.
-func (idx *DirIndex) Get(relpath string) (*fs.File, error) {
+func (idx *DirIndex) Get(relpath string) (*vfs.File, error) {
 	i := strings.LastIndex(relpath, "/")
 	if i == -1 {
 		return nil, errors.E("malformed relpath")
@@ -53,7 +53,7 @@ func (idx *DirIndex) Get(relpath string) (*fs.File, error) {
 	return nil, ErrFileNotFound
 }
 
-func (idx *DirIndex) GetDir(relpath string) (*fs.File, error) {
+func (idx *DirIndex) GetDir(relpath string) (*vfs.File, error) {
 	idx.Mu.RLock()
 	dir, ok := idx.Dir[relpath]
 	idx.Mu.RUnlock()
@@ -112,9 +112,9 @@ func (idx *DirIndex) StoreToFile(fp string) (err error) {
 	return idx.StoreTo(f)
 }
 
-func New(dirs... *fs.File) (*DirIndex) {
+func New(dirs... *vfs.File) (*DirIndex) {
 	idx := DirIndex{
-		Dir: make(map[string]*fs.File, len(dirs) + 1000),
+		Dir: make(map[string]*vfs.File, len(dirs) + 1000),
 	}
 	// idx.Mu.Lock()
 	for _, dir := range dirs {
@@ -124,7 +124,7 @@ func New(dirs... *fs.File) (*DirIndex) {
 	return &idx
 }
 // BuildFrom Locks until the channel is closed.
-func (idx *DirIndex) BuildFromChannel(c <-chan *fs.File) {
+func (idx *DirIndex) BuildFromChannel(c <-chan *vfs.File) {
 	idx.Mu.Lock()
 	for f := range c {
 		idx.Dir[f.Relpath] = f
@@ -149,9 +149,9 @@ func (a *DirIndex) Equals(b *DirIndex) bool {
 	if err != nil {
 		return false
 	}
-	stk := make([]*fs.File, 0, len(aroot.Children)) // estimate
+	stk := make([]*vfs.File, 0, len(aroot.Children)) // estimate
 	stk = append(stk, aroot)
-	var cur *fs.File
+	var cur *vfs.File
 	for l := len(stk); l != 0; {
 		stk, cur = stk[:l-2], stk[l-1]
 
@@ -186,13 +186,13 @@ func (a *DirIndex) Equals(b *DirIndex) bool {
 
 // DetailedEquals is used to provide feedback on what the differences are. If there are no, DetailedEquals
 // returns an empty slice.
-func (a *DirIndex) DetailedEquals(b *DirIndex) (diffs []string) {
+func (a *DirIndex) DetailedEquals(b *DirIndex) (difvfs []string) {
 	a.Mu.RLock()
 	defer a.Mu.RUnlock()
 	b.Mu.RLock()
 	defer b.Mu.RUnlock()
 	if len(a.Dir) != len(a.Dir) {
-		diffs = append(diffs, "the number of elements in the indexes are different.")
+		difvfs = append(difvfs, "the number of elements in the indexes are different.")
 	}
 	if len(a.Dir) == 0 { // catch nil and 0 elems
 		return
@@ -200,25 +200,25 @@ func (a *DirIndex) DetailedEquals(b *DirIndex) (diffs []string) {
 
 	aroot, err := a.GetDir("/")
 	if err != nil {
-		return append(diffs, "cannot find root dir in A index.") // abort
+		return append(difvfs, "cannot find root dir in A index.") // abort
 	}
-	stk := make([]*fs.File, 0, len(aroot.Children)) // estimate
+	stk := make([]*vfs.File, 0, len(aroot.Children)) // estimate
 	stk = append(stk, aroot)
-	var cur *fs.File
+	var cur *vfs.File
 	for l := len(stk); l > 0; l = len(stk) {
 		stk, cur = stk[:l-1], stk[l-1]
 
 		bcur, err := b.GetDir(cur.Relpath) 
 		if err != nil {
-			return append(diffs, "index B does not contain dir " + cur.Relpath) // abort
+			return append(difvfs, "index B does not contain dir " + cur.Relpath) // abort
 		}
 
 		if !cur.Equals(bcur) {
-			diffs = append(diffs, "index B has different version of " + cur.Relpath)
+			difvfs = append(difvfs, "index B has different version of " + cur.Relpath)
 		}
 
 		if len(cur.Children) != len(bcur.Children) {
-			diffs = append(diffs, "index B does have a different number of children for " + cur.Relpath)
+			difvfs = append(difvfs, "index B does have a different number of children for " + cur.Relpath)
 		}
 
 Loop:
@@ -232,7 +232,7 @@ Loop:
 					continue Loop
 				}
 			}
-			diffs = append(diffs, "index B does not contain file " + child.Relpath)
+			difvfs = append(difvfs, "index B does not contain file " + child.Relpath)
 		}
 	}
 	return

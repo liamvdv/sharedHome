@@ -1,19 +1,19 @@
-package fs_test
+package vfs_test
 
 import (
 	"os"
 	"testing"
 
-	"github.com/liamvdv/sharedHome/fs"
+	"github.com/liamvdv/sharedHome/vfs"
 )
 
 func TestEnrichUnix(t *testing.T) {
-	f := fs.File{
+	f := vfs.File{
 		Relpath: "/testdata/sth.txt",
 	}
 	fp := "./testdata/sth.txt"
 
-	if err := fs.Enrich(fp, &f); err != nil {
+	if err := vfs.Enrich(fp, &f); err != nil {
 		t.Error(err)
 	}
 	fi, err := os.Stat(fp)
@@ -37,7 +37,7 @@ func TestEnrichUnix(t *testing.T) {
 }
 
 func TestFileName(t *testing.T) {
-	f := fs.File{
+	f := vfs.File{
 		Relpath: "/testdata/sth.txt",
 	}
 	fp := "./testdata/sth.txt"

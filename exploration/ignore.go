@@ -2,13 +2,12 @@ package exploration
 
 import (
 	"bufio"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/liamvdv/sharedHome/config"
 	"github.com/liamvdv/sharedHome/errors"
-	"github.com/liamvdv/sharedHome/util"
+	"github.com/spf13/afero"
 )
 
 // MVP, just use O(N) lookup without support for globs, i.e. direct pattern matching only on the name.
@@ -29,7 +28,7 @@ func getGlobalIgnoreFunc(patterns []string) IgnoreFunc {
 
 // getIgnoreFunc returns a function that accepts a name and return whether it
 // should be EXCLUDED (true) or INCLUDED (false).
-func getIgnoreFunc(dp string, names []string) (IgnoreFunc, error) {
+func getIgnoreFunc(fs afero.Fs, dp string, names []string) (IgnoreFunc, error) {
 	const op = errors.Op("exploration.getIgnoreFunc")
 
 	there := false
@@ -48,11 +47,11 @@ func getIgnoreFunc(dp string, names []string) (IgnoreFunc, error) {
 
 	// exists, read in ignore file
 	fp := filepath.Join(dp, config.IgnoreFile)
-	file, err := os.Open(fp)
+	file, err := fs.Open(fp)
 	if err != nil {
 		return nil, errors.E(op, errors.Path(fp), err)
 	}
-	defer util.SaveClose(file)
+	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	var ignoreNames = make([]string, 0, 5) // sensible default
@@ -63,7 +62,7 @@ func getIgnoreFunc(dp string, names []string) (IgnoreFunc, error) {
 		if strings.HasPrefix(s, comment) || len(s) == 0 {
 			continue
 		}
-		// TODO(liamvdv): test whether scanner includes \r 
+		// TODO(liamvdv): test whether scanner includes \r
 		if li := len(s) - 1; s[li] == '\r' {
 			s = s[:li]
 		}

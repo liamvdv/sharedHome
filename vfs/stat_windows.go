@@ -1,6 +1,6 @@
 // + build windows
 
-package fs
+package vfs
 
 import (
 	"golang.org/x/sys/windows"

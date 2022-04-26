@@ -7,7 +7,6 @@ import (
 
 	"github.com/liamvdv/sharedHome/backend"
 	"github.com/liamvdv/sharedHome/errors"
-	"github.com/liamvdv/sharedHome/fs"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"

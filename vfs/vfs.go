@@ -1,12 +1,10 @@
-package fs
+package vfs
 
 import (
 	"fmt"
 	"io"
 	stdfs "io/fs"
-	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -54,7 +52,7 @@ func (a *File) Equals(b *File) bool {
 
 func (f File) String() string {
 	return fmt.Sprintf("{rp: %q %s s: %s mtime: %s}", f.Relpath, f.Mode, f.State, time.Unix(0, f.MTime))
-} 
+}
 
 type State uint16
 
@@ -80,28 +78,6 @@ func (s State) String() string {
 		panic("invalid state")
 	}
 	return toString[s]
-}
-
-// CleanPath turns any path into a path sharedHome use internally, see consistency.txt.
-// relpath = CleanPath(abspath[len(root):])
-func CleanPath(relpath string) string {
-	l := len(relpath)
-	if l == 0 {
-		panic("relpath empty")
-	}
-	if l == 1 {
-		return "/"
-	}
-	if r := relpath[l-1]; r == '/' || r == '\\' {
-		return strings.ReplaceAll(relpath[:l-1], `\`, `/`)
-	}
-	return strings.ReplaceAll(relpath, `\`, `/`) // on windows: replace, on linux: nothing happens
-}
-
-// returns the local platform specific representation of CleanPath.
-func LocalPath(relpath string) string {
-	const sep = string(os.PathSeparator)
-	return strings.ReplaceAll(relpath, "/", sep)
 }
 
 func PrettyPrint(w io.Writer, f *File) error {

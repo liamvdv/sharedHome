@@ -1,6 +1,6 @@
 // +build linux darwin unix
 
-package fs
+package vfs
 
 import (
 	stdfs "io/fs"
@@ -26,9 +26,9 @@ func Enrich(fp string, f *File) error {
 	return nil
 }
 
+// according to https://cs.opensource.google/go/go/+/refs/tags/go1.16.6:src/time/time.go;l=1137
+// adjusted for https://pkg.go.dev/golang.org/x/sys@v0.0.0-20210630005230-0f9fa26af87c/unix#Timespec
 func timespecToUnixNano(t unix.Timespec) int64 {
-	// according to https://cs.opensource.google/go/go/+/refs/tags/go1.16.6:src/time/time.go;l=1137
-	// adjusted for https://pkg.go.dev/golang.org/x/sys@v0.0.0-20210630005230-0f9fa26af87c/unix#Timespec
 	s, ns := t.Unix()
 	return s*1e9 + ns
 }

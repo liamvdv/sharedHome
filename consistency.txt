@@ -1,0 +1,5 @@
+Paths:
+To allow for cross platform / remote usage, all paths must be converted to 
+    - Relpath to known Root
+    - use a slash '/' as separator
+    - all paths start with a '/' and do not end with a '/' 
